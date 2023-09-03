@@ -2,12 +2,17 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 
 #define true 1
 #define false 0
 
 #define SBUFFERSIZE 512
 #define CBUFFERSIZE 4096
+
+#define opcmp(s, op, str) (strncmp(s + op.start, str, op.end - op.start) == 0)
+
+//#define printT(t) (printf("%d %d %lf %d\n", t.start, t.end, t.val, t.isNum))
 
 /*
  * start should be the index of the first char belonging to the term
@@ -26,13 +31,29 @@ static size_t STACK_POINTER;
 
 void push(struct term t);
 struct term pop(void);
-struct term peek(void);
+struct term peek(unsigned int num);
 struct term nextTerm(char *s, size_t start);
+void condense(char *s);
 
 int main()
 {
+	struct term current;
+	size_t index;
 	char input[CBUFFERSIZE];
 	fgets(input, CBUFFERSIZE, stdin);
+
+	index = 0;
+	while ((current = nextTerm(input, index)).isNum != -1) {
+		push(current);
+
+		while (peek(0).isNum && peek(1).isNum) {
+			condense(input);
+		}
+
+		index = current.start + 1;
+	}
+	current = pop();
+	printf("%lf\n", current.val);
 
 	return 0;
 }
@@ -54,13 +75,13 @@ struct term pop()
 	return STACK[--STACK_POINTER];
 }
 
-struct term peek()
+struct term peek(unsigned int num)
 {
 	if (STACK_POINTER == 0) {
 		fputs("peek() called on empty stack\n", stderr);
 		exit(1);
 	}
-	return STACK[STACK_POINTER - 1];
+	return STACK[STACK_POINTER - 1 - num];
 }
 
 struct term nextTerm(char *s, size_t start)
@@ -69,8 +90,9 @@ struct term nextTerm(char *s, size_t start)
 	while (isspace(s[start])) ++start;
 
 	if (s[start] == '\0') {
-		fputs("Term Search Overflows string\n", stderr);
-		exit(1);
+		// return weird term if at end
+		ans.isNum = -1;
+		return ans;
 	}
 	ans.start = start;
 
@@ -88,10 +110,9 @@ struct term nextTerm(char *s, size_t start)
 
 		++ans.end;
 	}
-	--ans.end;
 
 	// ensure '-' isnt treated as a number
-	if (ans.end == ans.start && s[ans.start] == '-') {
+	if (ans.end == ans.start + 1 && s[ans.start] == '-') {
 		ans.isNum = false;
 	}
 
@@ -100,4 +121,30 @@ struct term nextTerm(char *s, size_t start)
 	}
 
 	return ans;
+}
+
+void condense(char *s)
+{
+	struct term n1, n2, lastOp;
+
+	n2 = pop();
+	n1 = pop();
+	lastOp = pop();
+	lastOp.isNum = true;
+
+	if (opcmp(s, lastOp, "+")) {
+		lastOp.val = n1.val + n2.val;
+	} else if (opcmp(s, lastOp, "-")) {
+		lastOp.val = n1.val - n2.val;
+	} else if (opcmp(s, lastOp, "*")) {
+		lastOp.val = n1.val * n2.val;
+	} else if (opcmp(s, lastOp, "/")) {
+		lastOp.val = n1.val / n2.val;
+	} else {
+		// prepare to error out - desecrate s to print
+		// message properly
+		s[lastOp.end] = '\0';
+		fprintf(stderr, "Unknown Operation: %s\n", s + lastOp.start);
+	}
+	push(lastOp);
 }
