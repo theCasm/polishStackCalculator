@@ -40,20 +40,29 @@ int main()
 	struct term current;
 	size_t index;
 	char input[CBUFFERSIZE];
-	fgets(input, CBUFFERSIZE, stdin);
 
-	index = 0;
-	while ((current = nextTerm(input, index)).isNum != -1) {
-		push(current);
+	printf("] ");
+	while (fgets(input, CBUFFERSIZE, stdin) != NULL) {
+		index = 0;
+		while ((current = nextTerm(input, index)).isNum != -1) {
+			push(current);
 
-		while (peek(0).isNum && peek(1).isNum) {
-			condense(input);
+			while (peek(0).isNum && peek(1).isNum) {
+				condense(input);
+			}
+
+			index = current.end;
 		}
+		current = pop();
+		printf("= %.10g\n", current.val);
 
-		index = current.start + 1;
+		if (STACK_POINTER != 0) {
+			fputs("Syntax error: residual terms\n", stderr);
+			exit(1);
+		}
+		printf("] ");
 	}
-	current = pop();
-	printf("%lf\n", current.val);
+	putchar('\n');
 
 	return 0;
 }
